@@ -1,0 +1,176 @@
+﻿@using Telerik.Sitefinity.Frontend.Mvc.Helpers;
+@using Telerik.Sitefinity.Modules.Pages;
+@using Telerik.Sitefinity.Scheduling.Model;
+@using Telerik.Sitefinity.Scheduling;
+
+@Html.Script(ScriptRef.JQuery, "top")
+@Html.Script(ScriptRef.KendoWeb, "top")
+@Html.StyleSheet(Url.EmbeddedResource("Telerik.Sitefinity.Resources.Reference", "Telerik.Sitefinity.Resources.Themes.Light.Styles.Grid.css"))
+
+<style>
+    #progress-table {
+        width: 100%;
+    }
+</style>
+
+<h1 class="sfBreadCrumb">Scheduled tasks below (refresh period @(ViewBag.RefreshIntervalMs / 1000)s)</h1>
+
+<div class="sfWorkArea">
+    <div class="RadGrid RadGrid_Default rgTopOffset">
+        <table id="progress-table" class="rgMasterTable">
+            <thead>
+                <tr>
+                    <th>TaskName</th>
+                    <th>Status Message</th>
+                    <th>State</th>
+                    <th>Progress</th>
+                    <th>Execute Time</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="progress-container"></tbody>
+        </table>
+    </div>
+</div>
+
+<script type="text/x-kendo-template" id="tableTemplate">
+    # if (data.length == 0) { #
+    <tr>
+        <td colspan="4"><strong>No tasks are running currently</strong></td>
+    </tr>
+    # } #
+    # for (var i = 0; i < data.length; i++) { #
+    # var d = data[i] #
+    <tr class="progress rgRow" id="#= d.Id #">
+        <td>
+            <div>
+                <span>#= d.TaskName #</span>
+            </div>            
+        </td>
+        <td>
+            <div>
+                <span>
+                    #= d.StatusMessage? d.StatusMessage : '' #
+                </span>
+            </div>            
+        </td>
+        <td>
+            <div>
+                <span>
+                    #= getStatus(d.Status) #
+                </span>
+            </div>            
+        </td>
+        <td>
+            <div>
+                <span>
+                    #= d.Progress # %
+                </span>
+            </div>            
+        </td>
+        <td>
+            <div>
+                <span>
+                    #= new Date(parseInt(d.ExecuteTime.substr(6))) #
+                </span>
+            </div>            
+        </td>
+        <td class="actions">
+            <div>
+                <span>
+                    # if (getStatus(d.Status) == '@TaskStatus.Failed') { #
+                    <button onclick="return retry('#= d.Id #');" class="sfLinkBtn sfSave">Retry</button>
+                    # } #
+                    # if (getStatus(d.Status) == '@TaskStatus.Failed' ||
+                    getStatus(d.Status) == '@TaskStatus.Stopped') { #
+                    <button onclick="return deleteTask('#= d.Id #');" class="sfLinkBtn">Delete</button>
+                    # } #
+                </span>
+            </div>            
+        </td>
+    </tr>
+    # } #
+</script>
+
+<script>
+    var $progressContainer = $("#progress-container");
+
+    $(function () {      
+
+        beginPolling();
+    });
+
+
+    var _intervalHandle = null;
+
+    function beginPolling() {
+        refreshProgressBar();
+
+        _intervalHandle = window.setInterval(function () {
+            refreshProgressBar();
+        }, @ViewBag.RefreshIntervalMs);
+    }
+
+    function _removeHandlers() {
+        if (_intervalHandle) {
+            window.clearInterval(_intervalHandle);
+            _intervalHandle = null;
+        }
+    }
+
+    function refreshProgressBar() {
+
+        $.ajax({
+            url: '@Url.Action("Progress")',
+            type: "GET"
+        })
+        .done(function (data) {
+            var template = kendo.template($("#tableTemplate").html());
+
+            var output = template(data);
+
+            $progressContainer.html(output);
+        })
+    }
+
+    //  given a number it returns the corresponding text from the enum
+    //  Telerik.Sitefinity.Scheduling.Model.TaskStatus
+    function getStatus(status) {
+        switch (status) {
+            case 0: return "@TaskStatus.Pending.ToString()";
+            case 1: return "@TaskStatus.Started.ToString()";
+            case 2: return "@TaskStatus.Failed.ToString()";
+            case 3: return "@TaskStatus.Stopped.ToString()";
+            default: return "Unknown";
+        }
+    }
+
+    function retry(id) {
+        $.ajax({
+            url: "/Sitefinity/Services/SchedulingService.svc/" + id + "/manage?command=@((int)SchedulingTaskCommand.Restart)&provider=",
+            type: "PUT"
+        })
+        .done(function (data) {
+            alert("Done");
+            console.log(data);
+        });
+
+        return false;
+    }
+
+    function deleteTask(id) {
+
+        if (confirm('Are you sure you want to delete this task?')) {
+            $.ajax({
+                url: "/Sitefinity/Services/SchedulingService.svc/" + id + "/manage?command=@((int)SchedulingTaskCommand.Delete)&provider=",
+                type: "PUT"
+            })
+           .done(function (data) {
+
+               console.log(data);
+           });
+        }
+
+        return false;
+    }
+</script>
