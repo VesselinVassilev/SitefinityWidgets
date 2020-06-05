@@ -151,8 +151,7 @@
             type: "PUT"
         })
         .done(function (data) {
-            alert("Done");
-            console.log(data);
+            refreshProgressBar();
         });
 
         return false;
@@ -166,8 +165,7 @@
                 type: "PUT"
             })
            .done(function (data) {
-
-               console.log(data);
+	refreshProgressBar();
            });
         }
 
